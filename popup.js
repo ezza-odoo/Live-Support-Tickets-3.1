@@ -6,6 +6,9 @@ document.getElementById("ticketForm").addEventListener("submit", (event) => {
   const ticketTitle = titleInput ? titleInput.value.trim() : null;
   const ticketStage = document.querySelector('input[name="stage"]:checked').value;
 
+  const tagSelector = document.getElementById("tagSelector");
+  const ticketTagId = tagSelector && tagSelector.value ? parseInt(tagSelector.value, 10) : null;
+  
   const loadingElement = document.createElement("div");
   loadingElement.className = "loading";
   loadingElement.textContent = "Creating ticket...";
@@ -68,7 +71,12 @@ document.getElementById("ticketForm").addEventListener("submit", (event) => {
     try {
       chrome.tabs.sendMessage(
         tab.id,
-        { message: description, ticketType: ticketStage, ticketTitle: ticketTitle },
+        { 
+          message: description, 
+          ticketType: ticketStage, 
+          ticketTitle: ticketTitle,
+          ticketTagId: ticketTagId,
+        },
         (response) => {
           document.body.removeChild(loadingElement);
 
@@ -114,6 +122,7 @@ function adjustPopupSize() {
     window.resizeTo(paddedWidth, paddedHeight);
   }, 10);
 }
+
 /**
  * Shows a success message and link to the created ticket
  * @param {string} ticketUrl - URL to the created ticket
@@ -185,4 +194,23 @@ function showError(errorMessage) {
   }, 4000);
 }
 
-document.addEventListener("DOMContentLoaded", adjustPopupSize);
+document.addEventListener("DOMContentLoaded", () => {
+  adjustPopupSize();
+  const stageRadios = document.querySelectorAll('input[name="stage"]');
+  const tagContainer = document.getElementById("tagContainer");
+  const tagSelector = document.getElementById("tagSelector");
+
+  stageRadios.forEach(radio => {
+    radio.addEventListener('change', (event) => {
+      if (event.target.id === 'stage-func') {
+        tagContainer.style.display = 'block';
+        tagSelector.required = true;
+      } else {
+        tagContainer.style.display = 'none';
+        tagSelector.required = false;
+        tagSelector.value = '';
+      }
+      adjustPopupSize(); 
+    });
+  });
+});
