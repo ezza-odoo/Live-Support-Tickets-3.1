@@ -110,8 +110,46 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         return null;
       }
+
+      async function postLogNote(csrfToken, taskId, body) {
+        const payload = {
+          jsonrpc: "2.0",
+          method: "call",
+          params: {
+            post_data: {
+              body: body,
+              email_add_signature: false,
+              message_type: "comment",
+              subtype_xmlid: "mail.mt_note",
+            },
+            thread_id: taskId,
+            thread_model: "project.task",
+            context: {},
+          },
+          id: Date.now(),
+        };
+
+        const response = await fetch("/mail/message/post", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+          },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+
+        const result = await response.json();
+        console.log("Log note post result:", result);
+        if (result.error) {
+          throw new Error(result.error.data.message);
+        }
+        return result.result;
+      }
+
       const { email, subscription } = extractCustomer();
-      const description = `<a href="${window.location.href}"><strong>Conversation</strong></a><br><pre>${request.message ? request.message : ""}</pre>`;
+      const conversationLink = `Conversation: <a target="_blank" rel="noreferrer noopener" href="${window.location.href}">${window.location.href}</a>`;
+      const description = `<pre>${request.message ? request.message : ""}</pre>`;
       const stage = parseInt(request.ticketType)
       if (window.location.hostname.includes("odoo.com")) {
         let csrfToken = null;
@@ -201,10 +239,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (result.error) {
             sendResponse({ success: false, error: result.error.data.message });
           } else {
-            const url = `https://www.odoo.com/odoo/project.task/${result.result}`;
+            const taskId = result.result;
+            try {
+              await postLogNote(csrfToken, taskId, conversationLink);
+            } catch (logError) {
+              console.error("Failed to post log note:", logError);
+            }
+
+            const url = `https://www.odoo.com/odoo/project.task/${taskId}`;
             sendResponse({
               success: true,
-              taskId: result.result,
+              taskId: taskId,
               ticket: url,
             });
             window.open(url, '_blank');
